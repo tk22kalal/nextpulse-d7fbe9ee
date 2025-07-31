@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>College Image Finder</title>
+</head>
+<body>
+    <h1>College Image Finder</h1>
+    
+    <input type="text" id="collegeInput" placeholder="Enter college name">
+    <button id="searchButton">Search</button>
+    
+    <div id="resultsContainer"></div>
+
+    <script>
+        console.log("Script loaded");
+        
+        document.getElementById('searchButton').addEventListener('click', searchCollegeImages);
+        document.getElementById('collegeInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') searchCollegeImages();
+        });
+
+        async function searchCollegeImages() {
+            console.log("Search initiated");
+            const collegeName = document.getElementById('collegeInput').value.trim();
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            if (!collegeName) {
+                console.log("Empty input detected");
+                resultsContainer.innerHTML = '<p>Please enter a college name</p>';
+                return;
+            }
+            
+            console.log(`Searching for: ${collegeName}`);
+            resultsContainer.innerHTML = '<p>Searching...</p>';
+            
+            try {
+                // Step 1: Search for images related to the college
+                console.log("Making initial search request");
+                const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(collegeName)}&srnamespace=6&format=json&origin=*`;
+                console.log("Request URL:", searchUrl);
+                
+                const searchResponse = await fetch(searchUrl);
+                console.log("Search response received");
+                const searchData = await searchResponse.json();
+                console.log("Search data:", searchData);
+                
+                if (!searchData.query || searchData.query.search.length === 0) {
+                    console.log("No results found");
+                    resultsContainer.innerHTML = '<p>No images found for this college</p>';
+                    return;
+                }
+                
+                // Step 2: Get details for the first few images
+                const imageTitles = searchData.query.search.slice(0, 3).map(item => item.title);
+                console.log("Image titles to fetch:", imageTitles);
+                
+                const imageInfoUrl = `https://commons.wikimedia.org/w/api.php?action=query&titles=${imageTitles.join('|')}&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=400&format=json&origin=*`;
+                console.log("Image info URL:", imageInfoUrl);
+                
+                const imageInfoResponse = await fetch(imageInfoUrl);
+                console.log("Image info response received");
+                const imageInfoData = await imageInfoResponse.json();
+                console.log("Image info data:", imageInfoData);
+                
+                // Step 3: Display the results
+                let html = '';
+                const pages = imageInfoData.query.pages;
+                
+                for (const pageId in pages) {
+                    if (pages[pageId].imageinfo) {
+                        const imageInfo = pages[pageId].imageinfo[0];
+                        console.log(`Processing image ${pageId}:`, imageInfo);
+                        
+                        html += `
+                            <div>
+                                <h3>${collegeName}</h3>
+                                <img src="${imageInfo.thumburl}" width="400">
+                                <p>${imageInfo.extmetadata?.ImageDescription?.value || 'No description available'}</p>
+                                <hr>
+                            </div>
+                        `;
+                    }
+                }
+                
+                if (html) {
+                    console.log("Displaying results");
+                    resultsContainer.innerHTML = html;
+                } else {
+                    console.log("No valid images found after processing");
+                    resultsContainer.innerHTML = '<p>No displayable images found</p>';
+                }
+                
+            } catch (error) {
+                console.error("Error during search:", error);
+                resultsContainer.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
